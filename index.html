@@ -65,33 +65,6 @@
       color: var(--muted);
     }
 
-    .import {
-      position: relative;
-      overflow: hidden;
-      display: inline-flex;
-      gap: 9px;
-      align-items: center;
-      background: var(--blue);
-      color: #04111f;
-      font-weight: 800;
-      padding: 12px 16px;
-      border-radius: 10px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.2s;
-    }
-
-    .import:hover {
-      opacity: 0.9;
-    }
-
-    .import input {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-    }
-
     .status {
       font-size: 13px;
       margin-top: 10px;
@@ -559,7 +532,6 @@
     @media (max-width: 600px) {
       .wrap { padding: 20px 14px; }
       .top { display: block; }
-      .import { margin-top: 18px; }
       .status { text-align: left; }
       .kpis, .beh-content.open { grid-template-columns: 1fr; }
       .row { grid-template-columns: 60px 1fr 45px 35px 60px; gap: 4px; font-size: 10px; }
@@ -578,11 +550,7 @@
         <p>Taxa de acerto, payoff, risco e evolução do resultado em um único painel.</p>
       </div>
       <div>
-        <label class="import">
-          Importar planilha .xlsx
-          <input id="file" type="file" accept=".xlsx,.xls">
-        </label>
-        <div id="status" class="status">Exemplo ilustrativo · importe sua planilha</div>
+        <div id="status" class="status">Conectando à planilha do Google Sheets…</div>
       </div>
     </header>
 
@@ -609,8 +577,8 @@
       <div>
         <div class="label" style="margin-bottom:10px">Período</div>
         <div class="dates">
-          <label class="date-field">Data inicial<select id="dateStart" disabled><option>Importe a planilha</option></select></label>
-          <label class="date-field">Data final<select id="dateEnd" disabled><option>Importe a planilha</option></select></label>
+          <label class="date-field">Data inicial<select id="dateStart" disabled><option>Aguardando Google Sheets</option></select></label>
+          <label class="date-field">Data final<select id="dateEnd" disabled><option>Aguardando Google Sheets</option></select></label>
         </div>
       </div>
       <div>
@@ -1009,14 +977,14 @@
       range.disabled = !imported;
       range.max = available || 1;
       range.value = Math.min(tradeLimit || available, available) || 1;
-      value.textContent = imported ? `${range.value} de ${available}` : 'importe uma planilha';
+      value.textContent = imported ? `${range.value} de ${available}` : 'aguarde a conexão com o Google Sheets';
 
       const dates = imported ? [...new Set(state.rows.map(r => r.dateKey).filter(Boolean))].sort() : [];
       for (const id of ['dateStart', 'dateEnd']) {
         const el = document.getElementById(id),
               chosen = id === 'dateStart' ? dateStart : dateEnd;
         el.disabled = !imported;
-        el.innerHTML = imported ? `<option value="">${id === 'dateStart' ? 'Do início' : 'Até o fim'}</option>` + dates.map(d => `<option value="${d}">${dateLabel(d)}</option>`).join('') : '<option>Importe a planilha</option>';
+        el.innerHTML = imported ? `<option value="">${id === 'dateStart' ? 'Do início' : 'Até o fim'}</option>` + dates.map(d => `<option value="${d}">${dateLabel(d)}</option>`).join('') : '<option>Aguardando Google Sheets</option>';
         el.value = chosen;
       }
 
@@ -1123,7 +1091,7 @@
 
       const rows = s.rows ? s.rows.slice().reverse() : [];
       if (document.getElementById('tradeCount')) {
-        document.getElementById('tradeCount').textContent = rows.length ? `${s.trades} trades exibidos` : 'Importe a planilha';
+        document.getElementById('tradeCount').textContent = rows.length ? `${s.trades} trades exibidos` : 'Aguardando Google Sheets';
       }
 
       if (document.getElementById('trades')) {
@@ -1155,7 +1123,7 @@
 
     function renderCurve(eq, rows) {
       if (!eq.length) {
-        document.getElementById('equity').innerHTML = '<div class="empty">A curva detalhada será exibida após importar a planilha.</div>';
+        document.getElementById('equity').innerHTML = '<div class="empty">A curva detalhada será exibida após a conexão com o Google Sheets.</div>';
         return;
       }
       
@@ -1459,7 +1427,7 @@
         });
       }
 
-      if (!rows.length) throw new Error('Não encontrei trades válidos para importação.');
+      if (!rows.length) throw new Error('Não encontrei trades válidos no Google Sheets.');
       const capital = Number(matrix[0]?.[11]) || 9000;
       state = calculate(rows, capital);
       tradeLimit = rows.length;
@@ -1493,22 +1461,31 @@
       render();
     });
 
-    document.getElementById('file').addEventListener('change', async e => {
-      const f = e.target.files[0];
-      if (!f) return;
+    // ─── Integração automática com Google Sheets ───────────────────────────────
+    const GOOGLE_SHEET_ID = '1N45dKTSQxxQ_6yqr70B1pvieu6JI4Qty324IrByHEug';
+    const GOOGLE_SHEET_TAB = 'robo2';
+
+    async function loadGoogleSheet() {
       const status = document.getElementById('status');
       try {
-        status.textContent = 'Lendo a planilha…';
-        const data = await f.arrayBuffer();
-        parseWorkbook(XLSX.read(data, { type: 'array', cellDates: true }));
+        status.textContent = 'Lendo dados do Google Sheets…';
+        const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(GOOGLE_SHEET_TAB)}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Google Sheets respondeu ${response.status}`);
+        const csv = await response.text();
+        if (!csv || csv.trim().startsWith('<!DOCTYPE')) {
+          throw new Error('A planilha não está publicada ou compartilhada para leitura pública.');
+        }
+        parseWorkbook(XLSX.read(csv, { type: 'string', cellDates: true }));
         selectedStrategies = new Set(state.rows.map(r => r.strategy));
         render();
-        status.textContent = `Atualizado com ${f.name} · ${state.trades} trades`;
+        status.textContent = `Atualizado pelo Google Sheets · ${state.trades} trades`;
       } catch (err) {
-       status.textContent = 'Não foi possível importar: ' + err.message;
-       console.error(err);
-     }
-    });
+        status.textContent = 'Google Sheets indisponível. ' + err.message;
+        console.error('Falha ao carregar Google Sheets:', err);
+        render();
+      }
+    }
 
     let tradesChartInstance = null;
     function renderTradesChart(tradesList) {
@@ -1804,8 +1781,10 @@
       }
     }
     
-    // Inicia a renderização para a demo (estado inicial antes da importação)
+    // Exibe a demo imediatamente e tenta atualizar com o Google Sheets.
     render();
+    loadGoogleSheet();
   </script>
 </body>
 </html>
+
