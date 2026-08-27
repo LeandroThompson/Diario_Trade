@@ -1440,7 +1440,9 @@
         return value === undefined || value === null || String(value).trim() === '' ? '—' : String(value).trim();
       };
 
-      const colPoints = findColumn('PONTOS', 'RES. OPERAÇÃO (%)', 'RESULTADO OPERAÇÃO (%)');
+            const colPoints = findColumn('PONTOS', 'RES. OPERAÇÃO (%)', 'RESULTADO OPERAÇÃO (%)');
+      const colOperation = findColumn('RES. OPERAÇÃO', 'RESULTADO OPERAÇÃO');
+
       const colQty = findColumn('QTD', 'QTD COMPRA', 'QTD VENDA', 'QUANTIDADE');
       const colStrategy = findColumn('EVENTO', 'ESTRATÉGIA', 'ESTRATEGIA', 'SETUP');
             const colDate = findColumn('DATA', 'ABERTURA', 'DATA ABERTURA', 'FECHAMENTO', 'DATA FECHAMENTO');
@@ -1458,9 +1460,20 @@
         const r = matrix[i];
         if (!r || r.length === 0) continue;
 
-                const points = parseLocaleNumber(r[colPoints]);
+        let points = parseLocaleNumber(r[colPoints]);
         const qtyRaw = r[colQty];
         const qty = parseLocaleNumber(qtyRaw);
+        const operation = parseLocaleNumber(r[colOperation]);
+
+        // A coluna Res. Operação é a fonte de verdade do resultado financeiro.
+        // Se o CSV vier com uma escala incorreta (ex.: 20.167 em vez de 201,67),
+        // recalculamos os pontos a partir do resultado e da quantidade negociada.
+        if (Number.isFinite(operation) && Number.isFinite(qty) && qty > 0) {
+          const pointsFromOperation = operation / (qty * VALOR_POR_PONTO);
+          if (!Number.isFinite(points) || Math.abs(qty * points * VALOR_POR_PONTO - operation) > 1) {
+            points = pointsFromOperation;
+          }
+        }
 
         const strategy = String(r[colStrategy] || '').trim();
 
