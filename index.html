@@ -1804,8 +1804,42 @@
       }
     }
     
-    // Inicia a renderização para a demo (estado inicial antes da importação)
-    render();
+    // =========================================================================
+    // COLE O CÓDIGO NOVO AQUI (Substituindo o antigo "// Inicia a renderização...")
+    // =========================================================================
+
+    const urlPlanilha = 'https://docs.google.com/spreadsheets/d/1N45dKTSQxxQ_6yqr70B1pvieu6JI4Qty324IrByHEug/export?format=csv&gid=804450120';
+
+    function carregarDadosDoDrive() {
+      // Opcional: Você pode chamar o render() original aqui sem parâmetros se 
+      // quiser que a tela desenhe vazia/zerada enquanto o download acontece.
+      
+      fetch(urlPlanilha)
+        .then(response => {
+          if (!response.ok) throw new Error('Erro ao baixar planilha do Drive');
+          return response.text();
+        })
+        .then(dadosCSV => {
+          console.log("Planilha do Google Drive carregada!");
+          
+          // ATENÇÃO AQUI: Você precisa substituir "suaFuncaoQueLeOCSV" pelo nome da 
+          // função que você já usava no código antigo para transformar o texto do 
+          // arquivo nos dados do gráfico (a função que cria aquele objeto 's').
+          suaFuncaoQueLeOCSV(dadosCSV); 
+          
+        })
+        .catch(error => {
+          console.error("Falha:", error);
+          alert("Erro ao puxar dados do Google Drive. Verifique se o link é público.");
+          
+          // Carrega os dados de demo caso o download falhe
+          render(); 
+        });
+    }
+
+    // Dispara a busca automática assim que a página carrega
+    carregarDadosDoDrive();
+
   </script>
 </body>
 </html>
