@@ -1767,24 +1767,34 @@
             options: {
               responsive: true,
               maintainAspectRatio: false,
-              plugins: { 
+              plugins: {
                 legend: { display: false },
-                tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${money(context.raw)}`; } } }
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.dataset.label + ': ' + new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.raw);
+                    }
+                  }
+                }
               },
               scales: {
-                x: { grid: { display: false }, ticks: { color: '#91a9c1' } },
-                y: { grid: { color: 'rgba(255, 255, 255, 0.08)' }, ticks: { color: '#91a9c1', callback: function(value) { return 'R$ ' + value; } } }
+                x: {
+                  grid: { display: false },
+                  ticks: { color: '#91a9c1' }
+                },
+                y: {
+                  grid: { color: 'rgba(255, 255, 255, 0.08)' },
+                  ticks: {
+                    color: '#91a9c1',
+                    callback: function(value) { return 'R$ ' + value; }
+                  }
+                }
               }
             }
           });
         }
       }
     }
-    
-    // Exibe a demo imediatamente e tenta atualizar com o Google Sheets.
-    render();
-    loadGoogleSheet();
-    window.addEventListener('DOMContentLoaded', loadGoogleSheet);
   </script>
 </body>
 </html>
