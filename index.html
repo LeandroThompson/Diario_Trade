@@ -1805,39 +1805,49 @@
     }
     
     // =========================================================================
-    // COLE O CÓDIGO NOVO AQUI (Substituindo o antigo "// Inicia a renderização...")
+    // IMPORTAÇÃO AUTOMÁTICA — carrega os dados da planilha do Google Sheets (CSV)
     // =========================================================================
 
     const urlPlanilha = 'https://docs.google.com/spreadsheets/d/1N45dKTSQxxQ_6yqr70B1pvieu6JI4Qty324IrByHEug/export?format=csv&gid=804450120';
 
     function carregarDadosDoDrive() {
-      // Opcional: Você pode chamar o render() original aqui sem parâmetros se 
-      // quiser que a tela desenhe vazia/zerada enquanto o download acontece.
-      
-      fetch(urlPlanilha)
+      const status = document.getElementById('status');
+      if (status) status.textContent = 'Buscando planilha no Google Sheets…';
+
+      // "&_=" + Date.now() e cache:'no-store' evitam que o navegador/Google
+      // sirvam uma versao em cache do CSV quando a planilha for atualizada.
+      fetch(urlPlanilha + '&_=' + Date.now(), { cache: 'no-store' })
         .then(response => {
-          if (!response.ok) throw new Error('Erro ao baixar planilha do Drive');
+          if (!response.ok) throw new Error(`Erro ao baixar a planilha (HTTP ${response.status})`);
           return response.text();
         })
         .then(dadosCSV => {
-          console.log("Planilha do Google Drive carregada!");
-          
-          // ATENÇÃO AQUI: Você precisa substituir "suaFuncaoQueLeOCSV" pelo nome da 
-          // função que você já usava no código antigo para transformar o texto do 
-          // arquivo nos dados do gráfico (a função que cria aquele objeto 's').
-          suaFuncaoQueLeOCSV(dadosCSV); 
-          
+          // Se a planilha nao estiver publica, o Google devolve uma pagina de
+          // login em HTML em vez do CSV. Detectamos isso aqui para dar um erro claro.
+          if (/^\s*<(!doctype|html)/i.test(dadosCSV)) {
+            throw new Error('a planilha nao esta publica (compartilhe como "Qualquer pessoa com o link" > Leitor)');
+          }
+
+          // Reaproveita o MESMO parser usado na importacao manual de .xlsx
+          // (parseWorkbook), assim os dois caminhos ficam sempre consistentes.
+          const wb = XLSX.read(dadosCSV, { type: 'string' });
+          parseWorkbook(wb);
+          selectedStrategies = new Set(state.rows.map(r => r.strategy));
+          render();
+
+          if (status) status.textContent = `Atualizado via Google Sheets · ${state.trades} trades`;
+          console.log('Planilha do Google Sheets carregada com sucesso!');
         })
         .catch(error => {
-          console.error("Falha:", error);
-          alert("Erro ao puxar dados do Google Drive. Verifique se o link é público.");
-          
-          // Carrega os dados de demo caso o download falhe
-          render(); 
+          console.error('Falha ao carregar do Google Sheets:', error);
+          if (status) status.textContent = 'Nao foi possivel importar do Google Sheets: ' + error.message;
+
+          // Mostra o dashboard vazio em vez de travar a pagina.
+          render();
         });
     }
 
-    // Dispara a busca automática assim que a página carrega
+    // Dispara a busca automatica assim que a pagina carrega
     carregarDadosDoDrive();
 
   </script>
